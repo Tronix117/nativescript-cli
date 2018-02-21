@@ -279,6 +279,11 @@ interface IPlatformProjectService extends NodeJS.EventEmitter {
 	 * If there are parts in the project that are inconsistent with the desired options, marks them in the changeset flags.
 	 */
 	checkForChanges(changeset: IProjectChangesInfo, options: IProjectChangesOptions, projectData: IProjectData): Promise<void>;
+
+	/**
+	 * Build native part of a nativescript plugins if necessary
+	 */
+	prebuildNativePlugin(pluginName: string, platformsAndroidDirPath: string, aarOutputDir: string, tmpBuildDir: string): Promise<void>;
 }
 
 interface IAndroidProjectPropertiesManager {

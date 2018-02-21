@@ -5,7 +5,6 @@ import { EventEmitter } from "events";
 import { hook } from "../../common/helpers";
 import { APP_FOLDER_NAME, PACKAGE_JSON_FILE_NAME, LiveSyncTrackActionNames, USER_INTERACTION_NEEDED_EVENT_NAME, DEBUGGER_ATTACHED_EVENT_NAME, DEBUGGER_DETACHED_EVENT_NAME, TrackActionNames } from "../../constants";
 import { FileExtensions, DeviceTypes, DeviceDiscoveryEventNames } from "../../common/constants";
-import { buildAar, migrateIncludeGradle, BuildAarOptions } from "plugin-migrator";
 import { cache } from "../../common/decorators";
 
 const deviceDescriptorPrimaryKey = "identifier";
@@ -38,7 +37,8 @@ export class LiveSyncService extends EventEmitter implements IDebugLiveSyncServi
 		private $debugDataService: IDebugDataService,
 		private $analyticsService: IAnalyticsService,
 		private $usbLiveSyncService: DeprecatedUsbLiveSyncService,
-		private $injector: IInjector) {
+		private $injector: IInjector,
+		private $platformsData: IPlatformsData) {
 		super();
 	}
 
@@ -553,6 +553,8 @@ export class LiveSyncService extends EventEmitter implements IDebugLiveSyncServi
 
 								const allModifiedFiles = [].concat(currentFilesToSync).concat(currentFilesToRemove);
 								if (liveSyncData.watchAllFiles) {
+									let platformData: IPlatformData = this.$platformsData.getPlatformData("android", projectData);
+
 									allModifiedFiles.forEach(async (item) => {
 										let matchedItem = item.match(/(.*\/node_modules\/[\w-]+)\/platforms\/android\//)
 										if (matchedItem) {
@@ -562,18 +564,7 @@ export class LiveSyncService extends EventEmitter implements IDebugLiveSyncServi
 
 											const pluginPackageJason = require(path.resolve(matchedItem[1], PACKAGE_JSON_FILE_NAME));
 											if (pluginPackageJason && pluginPackageJason.name) {
-												let options: BuildAarOptions = {
-													pluginName: pluginPackageJason.name,
-													platformsAndroidDirPath: pluginInputOutputPath,
-													aarOutputDir: pluginInputOutputPath,
-													tempPluginDirPath: path.join(projectData.platformsDir, "tempPlugin")
-												}
-
-												if (await buildAar(options)) {
-													this.$logger.info(`Built aar for ${pluginPackageJason.name}`);
-												}
-
-												migrateIncludeGradle(options);
+												await platformData.platformProjectService.prebuildNativePlugin(pluginPackageJason.name, pluginInputOutputPath, pluginInputOutputPath, path.join(projectData.platformsDir, "tempPlugin"))
 											}
 										}
 									})
@@ -668,7 +659,7 @@ export class LiveSyncService extends EventEmitter implements IDebugLiveSyncServi
 
 					this.$logger.trace(`Chokidar raised event ${event} for ${filePath}.`);
 
-					if (!filePath.match(/.*gen_[\w-]+\.aar/)) {
+					if (!this.isBuildFromCLI(filePath)) {
 						if (event === "add" || event === "addDir" || event === "change" /* <--- what to do when change event is raised ? */) {
 							filesToSync.push(filePath);
 						} else if (event === "unlink" || event === "unlinkDir") {
@@ -693,6 +684,10 @@ export class LiveSyncService extends EventEmitter implements IDebugLiveSyncServi
 				});
 			});
 		}
+	}
+
+	private isBuildFromCLI(filePath: string) {
+		return filePath.match(/.*\/gen_[\w-]+\.aar/)
 	}
 
 	@cache()

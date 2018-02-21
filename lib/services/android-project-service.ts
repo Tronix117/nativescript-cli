@@ -443,22 +443,26 @@ export class AndroidProjectService extends projectServiceBaseLib.PlatformProject
 			// build Android plugins which contain AndroidManifest.xml and/or resources
 			const pluginPlatformsFolderPath = this.getPluginPlatformsFolderPath(pluginData, AndroidProjectService.ANDROID_PLATFORM_NAME);
 			if (this.$fs.exists(pluginPlatformsFolderPath)) {
-				let options: BuildAarOptions = {
-					pluginName: pluginData.name,
-					platformsAndroidDirPath: pluginPlatformsFolderPath,
-					aarOutputDir: pluginPlatformsFolderPath,
-					tempPluginDirPath: path.join(projectData.platformsDir, "tempPlugin")
-				}
-
-				if (await buildAar(options)) {
-					this.$logger.info(`Built aar for ${pluginData.name}`);
-				}
-
-				migrateIncludeGradle(options);
+				this.prebuildNativePlugin(pluginData.name, pluginPlatformsFolderPath, pluginPlatformsFolderPath, path.join(projectData.platformsDir, "tempPlugin"))
 			}
 		}
 
 		// Do nothing, the Android Gradle script will configure itself based on the input dependencies.json
+	}
+
+	public async prebuildNativePlugin(pluginName: string, platformsAndroidDirPath: string, aarOutputDir: string, tmpBuildDir: string): Promise<void> {
+		let options: BuildAarOptions = {
+			pluginName: pluginName,
+			platformsAndroidDirPath: platformsAndroidDirPath,
+			aarOutputDir: aarOutputDir,
+			tempPluginDirPath: tmpBuildDir
+		}
+
+		if (await buildAar(options)) {
+			this.$logger.info(`Built aar for ${pluginName}`);
+		}
+
+		migrateIncludeGradle(options);
 	}
 
 	public async processConfigurationFilesFromAppResources(): Promise<void> {
